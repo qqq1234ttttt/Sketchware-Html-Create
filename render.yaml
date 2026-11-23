@@ -1,8 +1,6 @@
 services:
   - type: web
-    name: html-to-apk-builder
-    runtime: python
+    name: sketchware-html-create
+    runtime: docker
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --workers 1 --threads 4 --timeout 120 main:app
     healthCheckPath: /health
