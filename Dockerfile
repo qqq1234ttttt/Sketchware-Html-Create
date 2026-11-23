@@ -4,12 +4,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV ANDROID_SDK_ROOT=/opt/android-sdk
 ENV ANDROID_HOME=/opt/android-sdk
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/jvm/java-17-openjdk-amd64/bin:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools"
+ENV GRADLE_HOME=/opt/gradle
+ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/jvm/java-17-openjdk-amd64/bin:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/opt/gradle/bin"
 
-# Install Java and required Linux packages.
-# Keep detailed logs to identify package or network failures.
+# Install Java and required tools.
 RUN set -eux; \
-    cat /etc/os-release; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
         openjdk-17-jdk-headless \
@@ -20,7 +19,17 @@ RUN set -eux; \
     java -version; \
     rm -rf /var/lib/apt/lists/*
 
-# Download and install Android command-line tools.
+# Install Gradle 8.9.
+RUN set -eux; \
+    wget --https-only --tries=3 --timeout=30 \
+        https://services.gradle.org/distributions/gradle-8.9-bin.zip \
+        -O /tmp/gradle.zip; \
+    unzip -q /tmp/gradle.zip -d /opt; \
+    mv /opt/gradle-8.9 "${GRADLE_HOME}"; \
+    rm -f /tmp/gradle.zip; \
+    gradle --version
+
+# Install Android command-line tools.
 RUN set -eux; \
     mkdir -p "${ANDROID_SDK_ROOT}/cmdline-tools"; \
     wget --https-only --tries=3 --timeout=30 \
@@ -34,7 +43,7 @@ RUN set -eux; \
     test -x "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"; \
     sdkmanager --version
 
-# Accept Android SDK licenses and install required SDK packages.
+# Accept licenses and install Android SDK packages.
 RUN set -eux; \
     yes | sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --licenses \
         || test "$?" -eq 141; \
@@ -47,18 +56,18 @@ RUN set -eux; \
 
 WORKDIR /app
 
-# Install Python dependencies.
 COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# Copy the Flask backend.
 COPY main.py /app/main.py
 
-# Verify the Android build environment.
+# Verify all build tools.
 RUN set -eux; \
     command -v java; \
+    command -v gradle; \
     command -v sdkmanager; \
     java -version; \
+    gradle --version; \
     sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --list_installed
 
 EXPOSE 10000
